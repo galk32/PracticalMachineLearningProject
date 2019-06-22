@@ -1,0 +1,146 @@
+---
+title: "Prediction Assignment Writeup Coursera"
+author: "Giorgos Anastasakos"
+date: "20-6-2019"
+output: html_document
+---
+# Overview
+This is a final project for the Coursera "Practical Machine Learning" course. 
+
+Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behaviour, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+Data
+
+The training data for this project are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har. If you use the document you create for this class for any purpose please cite them as they have been very generous in allowing their data to be used for this kind of assignment.
+
+
+## Now we will load the necessary  libraries.
+
+```{r, echo=FALSE}
+library(caret); library(tidyverse)
+
+```
+
+## Reading the Training and Testing Set and cleaning the data - removing NAs and uneseccary 
+varilables 1:7 which have no value for the fittin model proccess 
+
+```{r}
+pmlTrain <- read.csv(file = "./data/pml-training.csv", header = T)
+testQuiz <- read.csv(file ="./data/pml-testing.csv", header = T )
+#checking for NAs
+any(is.na(testQuiz))
+any(is.na(pmlTrain))
+
+#reamoning NAs
+pmlTrain<- pmlTrain[, colSums(is.na(pmlTrain)) == 0]
+testQuiz <- testQuiz[, colSums(is.na(testQuiz)) == 0]
+
+#removing 1:7 column because the don't have any use
+pmlTrain <- pmlTrain[, -c(1:7)]
+testQuiz <- testQuiz[, -c(1:7)]
+
+```
+## Now i will clear the nearZero Variables.
+```{r}
+nearzv <- nearZeroVar(pmlTrain)
+pmlTrain <- pmlTrain[,-nearzv]
+
+```
+## Making the train and test set from plmTrain
+
+```{r}
+inTrain <- createDataPartition(y = pmlTrain$classe, p=0.7, list = F)
+
+train <- pmlTrain[inTrain,]
+test <- pmlTrain[-inTrain,]
+
+```
+
+# Model fit
+For the model fit we will try 3 classifing algorithms:
+*Random Forest
+*Stochastic Gradient Boosting
+*k-Nearest Neighbors
+
+*For all three algorthms we will use Cross Validation with the method CV and three folds*
+
+### First will try the Random Forest Algorithm.
+
+```{r}
+set.seed(1234)
+
+controlSplit <- trainControl(method="cv", number=3, verboseIter=FALSE)
+modRF <- train(classe ~ ., data=train, method="rf", trControl=controlSplit)
+modRF
+
+predRF <- predict(modRF, test)
+confusionMatrix(predRF, test$classe)
+plot(modRF)
+varImp(modRF)
+
+```
+**The out of sample error is nearly 0.0051 which is too small maybe because of overfitting
+of the model.**
+
+### The second algorithm that will try is the Stochastic Gradient Boosting
+
+```{r}
+
+set.seed(1234)
+controlSplit <- trainControl(method="cv", number=3, verboseIter=FALSE)
+modGBM <- train(classe ~ ., data=train, method="gbm", trControl=controlSplit, verbose = FALSE)
+modGBM
+  
+predGBM <- predict(modGBM, test)
+confusionMatrix(predGBM, test$classe)
+
+```
+**The out of sample error is nearly 0.0321 which is again too small maybe because of overfitting
+of the model just like Random Forest**
+
+### The last method that we will use is the k-Nearest Neighbors.
+```{r}
+set.seed(1234)
+controlSplit <- trainControl(method="cv", number=3, verboseIter=FALSE)
+
+modKnn <- train(classe ~ ., data=train, method="knn", trControl=controlSplit,preProcess = c("center", "scale"))
+modKnn
+
+plot(modKnn)
+predKnn <- predict(modKnn, test)
+confusionMatrix(predKnn, test$classe)
+
+
+```
+### Now we will use the carot function resamples in order to choice the best model for the 
+prediction.
+
+```{r}
+
+#resamples
+
+resamps <- resamples(list(RF = modRF, GBM=modGBM, KNN =modKnn))
+summary(resamps)
+dotplot(resamps)
+
+```
+
+# It's obvious that Random Forest is the best model for the current data set.
+
+```{r}
+predQuetRF <- predict(modRF, testQuiz)
+print(predQuet)
+
+```
+
+
+
